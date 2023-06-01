@@ -21,6 +21,32 @@ index 5560b7f4c4e43e82111e5531e4d57377b5f0d0ab..e0eae8b46fa1177214f2ed833f2b40e0
 +            "'secure chat', such as offline-mode servers.");
 +    }
  }
+diff --git a/src/main/java/net/minecraft/network/protocol/game/ServerboundChatCommandPacket.java b/src/main/java/net/minecraft/network/protocol/game/ServerboundChatCommandPacket.java
+index b8c1f3b9afddc87d56541c8af63cffecfcdd2653..c482b8f57e350c465568d13a846381849a0f5ec9 100644
+--- a/src/main/java/net/minecraft/network/protocol/game/ServerboundChatCommandPacket.java
++++ b/src/main/java/net/minecraft/network/protocol/game/ServerboundChatCommandPacket.java
+@@ -16,7 +16,7 @@ public record ServerboundChatCommandPacket(String command, Instant timeStamp, lo
+         buf.writeUtf(this.command, 256);
+         buf.writeInstant(this.timeStamp);
+         buf.writeLong(this.salt);
+-        this.argumentSignatures.write(buf);
++        if (!dev.etil.mirai.MiraiConfig.chatMessageSignatures) this.argumentSignatures.write(buf); // Mirai - configurable chat message signatures
+         this.lastSeenMessages.write(buf);
+     }
+ 
+diff --git a/src/main/java/net/minecraft/network/protocol/game/ServerboundChatPacket.java b/src/main/java/net/minecraft/network/protocol/game/ServerboundChatPacket.java
+index d1d2fc0c57523c1abf1e8bfec913c78927c3dafc..96a69a350c0cabf1a9c4d2a7585f97d489f8f76c 100644
+--- a/src/main/java/net/minecraft/network/protocol/game/ServerboundChatPacket.java
++++ b/src/main/java/net/minecraft/network/protocol/game/ServerboundChatPacket.java
+@@ -17,7 +17,7 @@ public record ServerboundChatPacket(String message, Instant timeStamp, long salt
+         buf.writeUtf(this.message, 256);
+         buf.writeInstant(this.timeStamp);
+         buf.writeLong(this.salt);
+-        buf.writeNullable(this.signature, MessageSignature::write);
++        if (!dev.etil.mirai.MiraiConfig.chatMessageSignatures) buf.writeNullable(this.signature, MessageSignature::write); // Mirai - configurable chat message signatures
+         this.lastSeenMessages.write(buf);
+     }
+ 
 diff --git a/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java b/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java
 index e6cc2bab1fde2e8c1394772b99201ea8d7eb8057..c9d8f00d97299033d6fd6a000ed82e96e84beb35 100644
 --- a/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java
