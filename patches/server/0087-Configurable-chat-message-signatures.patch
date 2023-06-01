@@ -3,7 +3,6 @@ From: etil2jz <81570777+etil2jz@users.noreply.github.com>
 Date: Tue, 2 Aug 2022 14:48:12 +0200
 Subject: [PATCH] Configurable chat message signatures
 
-// TODO - check if I port right.
 
 diff --git a/src/main/java/dev/etil/mirai/MiraiConfig.java b/src/main/java/dev/etil/mirai/MiraiConfig.java
 index 5560b7f4c4e43e82111e5531e4d57377b5f0d0ab..e0eae8b46fa1177214f2ed833f2b40e0bf407211 100644
@@ -23,17 +22,18 @@ index 5560b7f4c4e43e82111e5531e4d57377b5f0d0ab..e0eae8b46fa1177214f2ed833f2b40e0
 +    }
  }
 diff --git a/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java b/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java
-index e6cc2bab1fde2e8c1394772b99201ea8d7eb8057..e35686a816c22b92ed8d988dc68c440ef6eea347 100644
+index e6cc2bab1fde2e8c1394772b99201ea8d7eb8057..c9d8f00d97299033d6fd6a000ed82e96e84beb35 100644
 --- a/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java
 +++ b/src/main/java/net/minecraft/network/protocol/status/ServerStatus.java
-@@ -15,6 +15,7 @@ import net.minecraft.network.chat.CommonComponents;
- import net.minecraft.network.chat.Component;
- import net.minecraft.util.ExtraCodecs;
+@@ -17,7 +17,7 @@ import net.minecraft.util.ExtraCodecs;
  
-+// Mirai TODO - Add configurable chat message signatures here
  public record ServerStatus(Component description, Optional<ServerStatus.Players> players, Optional<ServerStatus.Version> version, Optional<ServerStatus.Favicon> favicon, boolean enforcesSecureChat) {
      public static final Codec<ServerStatus> CODEC = RecordCodecBuilder.create((instance) -> {
-         return instance.group(ExtraCodecs.COMPONENT.optionalFieldOf("description", CommonComponents.EMPTY).forGetter(ServerStatus::description), ServerStatus.Players.CODEC.optionalFieldOf("players").forGetter(ServerStatus::players), ServerStatus.Version.CODEC.optionalFieldOf("version").forGetter(ServerStatus::version), ServerStatus.Favicon.CODEC.optionalFieldOf("favicon").forGetter(ServerStatus::favicon), Codec.BOOL.optionalFieldOf("enforcesSecureChat", Boolean.valueOf(false)).forGetter(ServerStatus::enforcesSecureChat)).apply(instance, ServerStatus::new);
+-        return instance.group(ExtraCodecs.COMPONENT.optionalFieldOf("description", CommonComponents.EMPTY).forGetter(ServerStatus::description), ServerStatus.Players.CODEC.optionalFieldOf("players").forGetter(ServerStatus::players), ServerStatus.Version.CODEC.optionalFieldOf("version").forGetter(ServerStatus::version), ServerStatus.Favicon.CODEC.optionalFieldOf("favicon").forGetter(ServerStatus::favicon), Codec.BOOL.optionalFieldOf("enforcesSecureChat", Boolean.valueOf(false)).forGetter(ServerStatus::enforcesSecureChat)).apply(instance, ServerStatus::new);
++        if (dev.etil.mirai.MiraiConfig.chatMessageSignatures) return instance.group(ExtraCodecs.COMPONENT.optionalFieldOf("description", CommonComponents.EMPTY).forGetter(ServerStatus::description), ServerStatus.Players.CODEC.optionalFieldOf("players").forGetter(ServerStatus::players), ServerStatus.Version.CODEC.optionalFieldOf("version").forGetter(ServerStatus::version), ServerStatus.Favicon.CODEC.optionalFieldOf("favicon").forGetter(ServerStatus::favicon), Codec.BOOL.optionalFieldOf("enforcesSecureChat", Boolean.valueOf(false)).forGetter(x -> true)).apply(instance, ServerStatus::new); else return instance.group(ExtraCodecs.COMPONENT.optionalFieldOf("description", CommonComponents.EMPTY).forGetter(ServerStatus::description), ServerStatus.Players.CODEC.optionalFieldOf("players").forGetter(ServerStatus::players), ServerStatus.Version.CODEC.optionalFieldOf("version").forGetter(ServerStatus::version), ServerStatus.Favicon.CODEC.optionalFieldOf("favicon").forGetter(ServerStatus::favicon), Codec.BOOL.optionalFieldOf("enforcesSecureChat", Boolean.valueOf(false)).forGetter(ServerStatus::enforcesSecureChat)).apply(instance, ServerStatus::new); // Mirai - configurable chat message signatures
+     });
+ 
+     public static record Favicon(byte[] iconBytes) {
 diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 index 6fcd07ecc03b136b0181154c28c739028915af16..b0b059007b6f46c02168497610c0afb3824f296e 100644
 --- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
@@ -46,20 +46,30 @@ index 6fcd07ecc03b136b0181154c28c739028915af16..b0b059007b6f46c02168497610c0afb3
          return this.getProperties().enforceSecureProfile && this.getProperties().onlineMode;
      }
  
+diff --git a/src/main/java/net/minecraft/server/level/ServerPlayer.java b/src/main/java/net/minecraft/server/level/ServerPlayer.java
+index 1eedc1de385d6355ce9624923216678c423aee5e..47325122bdc3fec780555b234ec100a11ebf9b8b 100644
+--- a/src/main/java/net/minecraft/server/level/ServerPlayer.java
++++ b/src/main/java/net/minecraft/server/level/ServerPlayer.java
+@@ -2030,7 +2030,7 @@ public class ServerPlayer extends Player {
+     }
+ 
+     public void sendServerStatus(ServerStatus metadata) {
+-        this.connection.send(new ClientboundServerDataPacket(metadata.description(), metadata.favicon().map(ServerStatus.Favicon::iconBytes), metadata.enforcesSecureChat()));
++        if (dev.etil.mirai.MiraiConfig.chatMessageSignatures) this.connection.send(new ClientboundServerDataPacket(metadata.description(), metadata.favicon().map(ServerStatus.Favicon::iconBytes), true)); else this.connection.send(new ClientboundServerDataPacket(metadata.description(), metadata.favicon().map(ServerStatus.Favicon::iconBytes), metadata.enforcesSecureChat())); // Mirai - configurable chat message signatures
+     }
+ 
+     @Override
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index 241f7b0b8cbaf7be081815a665e927c7ac1f874b..ef8e384feea6498990b2b6bd107097063270b1c5 100644
+index 241f7b0b8cbaf7be081815a665e927c7ac1f874b..73a867ee0ada072970751c6ab9288bf3fa6ba40f 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -2160,10 +2160,37 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2160,10 +2160,31 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
  
      @Override
      public void send(Packet<?> packet) {
 +        // Mirai start - configurable chat message signatures
 +        if (dev.etil.mirai.MiraiConfig.chatMessageSignatures) {
-+            if (packet instanceof ClientboundPlayerChatPacket chat) {
-+                LOGGER.info("Sending message: {}", chat.unsignedContent() != null ? chat.unsignedContent()
-+                    : chat.body().content());
-+            } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundPlayerChatPacket chat) {
++            if (packet instanceof net.minecraft.network.protocol.game.ClientboundPlayerChatPacket chat) {
 +                packet = new ClientboundSystemChatPacket(chat.chatType().resolve(this.player.level.registryAccess())
 +                    .get().decorate(chat.unsignedContent() != null ? chat.unsignedContent()
 +                        : Component.literal(chat.body().content())), false);
@@ -76,10 +86,7 @@ index 241f7b0b8cbaf7be081815a665e927c7ac1f874b..ef8e384feea6498990b2b6bd10709706
      public void send(Packet<?> packet, @Nullable PacketSendListener callbacks) {
 +        // Mirai start - configurable chat message signatures
 +        if (dev.etil.mirai.MiraiConfig.chatMessageSignatures) {
-+            if (packet instanceof ClientboundPlayerChatPacket chat) {
-+                LOGGER.info("Sending message: {}", chat.unsignedContent() != null ? chat.unsignedContent()
-+                    : chat.body().content());
-+            } else if (packet instanceof net.minecraft.network.protocol.game.ClientboundPlayerChatPacket chat && callbacks != null) {
++            if (packet instanceof net.minecraft.network.protocol.game.ClientboundPlayerChatPacket chat && callbacks != null) {
 +                this.send(chat);
 +                return;
 +            }
